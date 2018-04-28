@@ -408,12 +408,10 @@ namespace tools
         : refresh_error(std::move(loc), "Index out of bounds of of hashchain")
       {
       }
-       std::string to_string() const { return refresh_error::to_string(); }
+
+      std::string to_string() const { return refresh_error::to_string(); }
     };
     //----------------------------------------------------------------------------------------------------
-
-
-
     struct transfer_error : public wallet_logic_error
     {
     protected:
