@@ -60,6 +60,12 @@ endif()
 set(device_private_headers)
 
 
+if(PER_BLOCK_CHECKPOINT)
+  set(Blocks "blocks")
+else()
+  set(Blocks "")
+endif()
+
 monero_private_headers(device
   ${device_private_headers})
 
@@ -76,4 +82,5 @@ target_link_libraries(device
     ${OPENSSL_CRYPTO_LIBRARIES}
     ${Boost_SERIALIZATION_LIBRARY}
   PRIVATE
+    ${Blocks}
     ${EXTRA_LIBRARIES})
