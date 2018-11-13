@@ -1,0 +1,388 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 158cfff..e82c436 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -429,18 +429,18 @@ if(STATIC AND NOT IOS)
+   endif()
+ endif()
+ 
+-if (NOT IOS)
+-  find_package(PCSC)
+-endif()
++#if (NOT IOS)
++#  find_package(PCSC)
++#endif()
+ # Final setup for libpcsc
+-if (PCSC_FOUND) 
+-  message(STATUS "Using PCSC include dir at ${PCSC_INCLUDE_DIR}")
+-  add_definitions(-DHAVE_PCSC)
+-  include_directories(${PCSC_INCLUDE_DIR})
+-  link_directories(${LIBPCSC_LIBRARY_DIRS})
+-else (PCSC_FOUND)
+-  message(STATUS "Could not find PCSC")
+-endif()
++#if (PCSC_FOUND) 
++#  message(STATUS "Using PCSC include dir at ${PCSC_INCLUDE_DIR}")
++#  add_definitions(-DHAVE_PCSC)
++#  include_directories(${PCSC_INCLUDE_DIR})
++#  link_directories(${LIBPCSC_LIBRARY_DIRS})
++#else (PCSC_FOUND)
++#  message(STATUS "Could not find PCSC")
++#endif()
+ 
+ add_definition_if_library_exists(c memset_s "string.h" HAVE_MEMSET_S)
+ add_definition_if_library_exists(c explicit_bzero "strings.h" HAVE_EXPLICIT_BZERO)
+@@ -507,7 +507,7 @@ else()
+     set(ARCH_FLAG "-march=${ARCH}")
+   endif()
+   set(WARNINGS "-Wall -Wextra -Wpointer-arith -Wundef -Wvla -Wwrite-strings -Wno-error=extra -Wno-error=deprecated-declarations -Wno-unused-parameter -Wno-unused-variable -Wno-error=unused-variable -Wno-error=undef -Wno-error=uninitialized")
+-  if(NOT MINGW)
++  if(NOT MINGW AND NOT ANDROID)
+     set(WARNINGS_AS_ERRORS_FLAG "-Werror")
+   endif()
+   if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+@@ -804,7 +804,7 @@ if(STATIC)
+   set(Boost_USE_STATIC_LIBS ON)
+   set(Boost_USE_STATIC_RUNTIME ON)
+ endif()
+-find_package(Boost 1.58 QUIET REQUIRED COMPONENTS system filesystem thread date_time chrono regex serialization program_options locale)
++find_package(Boost 1.58 QUIET REQUIRED COMPONENTS system filesystem thread date_time chrono regex serialization program_options)
+ 
+ set(CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_LIB_SUFFIXES})
+ if(NOT Boost_FOUND)
+@@ -860,18 +860,18 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND ARCH_WIDTH EQUAL "32" AND NOT IOS AN
+   list(APPEND EXTRA_LIBRARIES ${ATOMIC})
+ endif()
+ 
+-find_path(ZMQ_INCLUDE_PATH zmq.hpp)
+-find_library(ZMQ_LIB zmq)
++#find_path(ZMQ_INCLUDE_PATH zmq.hpp)
++#find_library(ZMQ_LIB zmq)
+ find_library(PGM_LIBRARY pgm)
+ find_library(NORM_LIBRARY norm)
+ find_library(SODIUM_LIBRARY sodium)
+ 
+-if(NOT ZMQ_INCLUDE_PATH)
+-  message(FATAL_ERROR "Could not find required header zmq.hpp")
+-endif()
+-if(NOT ZMQ_LIB)
+-  message(FATAL_ERROR "Could not find required libzmq")
+-endif()
++#if(NOT ZMQ_INCLUDE_PATH)
++#  message(FATAL_ERROR "Could not find required header zmq.hpp")
++#endif()
++#if(NOT ZMQ_LIB)
++#  message(FATAL_ERROR "Could not find required libzmq")
++#endif()
+ if(PGM_LIBRARY)
+   set(ZMQ_LIB "${ZMQ_LIB};${PGM_LIBRARY}")
+ endif()
+diff --git a/src/crypto/cn_slow_hash_hard_intel.cpp b/src/crypto/cn_slow_hash_hard_intel.cpp
+index 6de3730..b88c3d0 100644
+--- a/src/crypto/cn_slow_hash_hard_intel.cpp
++++ b/src/crypto/cn_slow_hash_hard_intel.cpp
+@@ -93,34 +93,34 @@ inline void aes_genkey(const __m128i* memory, __m128i& k0, __m128i& k1, __m128i&
+ 	k9 = xout2;
+ }
+ 
+-inline __m128i aes_round_tweak_div(__m128i& val, const __m128i& key)
+-{
+-  union alignas(16) {
+-    uint32_t k[4];
+-    uint64_t v64[2];
+-    // __uint128_t v128;
+-  };
+-  alignas(16) uint32_t x[4];
+-  _mm_store_si128((__m128i*)k, key);
+-  val = ~val;
+-  _mm_store_si128((__m128i*)x, val);
+-  #define BYTE(p, i) ((unsigned char*)&p)[i]
+-  k[0] ^= saes_table[0][BYTE(x[0], 0)] ^ saes_table[1][BYTE(x[1], 1)] ^ saes_table[2][BYTE(x[2], 2)] ^ saes_table[3][BYTE(x[3], 3)];
+-  x[0] ^= k[0];
+-  k[1] ^= saes_table[0][BYTE(x[1], 0)] ^ saes_table[1][BYTE(x[2], 1)] ^ saes_table[2][BYTE(x[3], 2)] ^ saes_table[3][BYTE(x[0], 3)];
+-  x[1] ^= k[1];
+-  k[2] ^= saes_table[0][BYTE(x[2], 0)] ^ saes_table[1][BYTE(x[3], 1)] ^ saes_table[2][BYTE(x[0], 2)] ^ saes_table[3][BYTE(x[1], 3)];
+-  x[2] ^= k[2];
+-  k[3] ^= saes_table[0][BYTE(x[3], 0)] ^ saes_table[1][BYTE(x[0], 1)] ^ saes_table[2][BYTE(x[1], 2)] ^ saes_table[3][BYTE(x[2], 3)];
+-  #undef BYTE
+-  return _mm_load_si128((__m128i*)k);
+-  /*
+-  v128 ^= (v128 / v64[0]) ^ (v128 % v64[1]);
+-  v64[1] ^= (v128 % v64[0]) ^ (v128 % v64[1]);
+-  return _mm_load_si128((__m128i*)k);
+-  */
+-}
+-
++inline __m128i aes_round_tweak_div(__m128i& val, const __m128i& key)
++{
++  union alignas(16) {
++    uint32_t k[4];
++    uint64_t v64[2];
++    // __uint128_t v128;
++  };
++  alignas(16) uint32_t x[4];
++  _mm_store_si128((__m128i*)k, key);
++  val = ~val;
++  _mm_store_si128((__m128i*)x, val);
++  #define BYTE(p, i) ((unsigned char*)&p)[i]
++  k[0] ^= saes_table[0][BYTE(x[0], 0)] ^ saes_table[1][BYTE(x[1], 1)] ^ saes_table[2][BYTE(x[2], 2)] ^ saes_table[3][BYTE(x[3], 3)];
++  x[0] ^= k[0];
++  k[1] ^= saes_table[0][BYTE(x[1], 0)] ^ saes_table[1][BYTE(x[2], 1)] ^ saes_table[2][BYTE(x[3], 2)] ^ saes_table[3][BYTE(x[0], 3)];
++  x[1] ^= k[1];
++  k[2] ^= saes_table[0][BYTE(x[2], 0)] ^ saes_table[1][BYTE(x[3], 1)] ^ saes_table[2][BYTE(x[0], 2)] ^ saes_table[3][BYTE(x[1], 3)];
++  x[2] ^= k[2];
++  k[3] ^= saes_table[0][BYTE(x[3], 0)] ^ saes_table[1][BYTE(x[0], 1)] ^ saes_table[2][BYTE(x[1], 2)] ^ saes_table[3][BYTE(x[2], 3)];
++  #undef BYTE
++  return _mm_load_si128((__m128i*)k);
++  /*
++  v128 ^= (v128 / v64[0]) ^ (v128 % v64[1]);
++  v64[1] ^= (v128 % v64[0]) ^ (v128 % v64[1]);
++  return _mm_load_si128((__m128i*)k);
++  */
++}
++
+ inline void aes_round8(const __m128i& key, __m128i& x0, __m128i& x1, __m128i& x2, __m128i& x3, __m128i& x4, __m128i& x5, __m128i& x6, __m128i& x7)
+ {
+ 	x0 = _mm_aesenc_si128(x0, key);
+@@ -185,11 +185,11 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::implode_scratchpad_hard()
+ 		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
+ 		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+ 
+-		if (VERSION == 2)
++		if (VERSION == 2)
+ 			xor_shift(x0, x1, x2, x3, x4, x5, x6, x7);
+ 	}
+ 
+-	for (size_t i = 0; VERSION == 2 && i < MEMORY / sizeof(__m128i); i +=8)
++	for (size_t i = 0; VERSION == 2 && i < MEMORY / sizeof(__m128i); i +=8)
+ 	{
+ 		x0 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm() + i + 0), x0);
+ 		x1 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm() + i + 1), x1);
+@@ -214,7 +214,7 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::implode_scratchpad_hard()
+ 		xor_shift(x0, x1, x2, x3, x4, x5, x6, x7);
+ 	}
+ 
+-	for (size_t i = 0; VERSION == 2 && i < 16; i++)
++	for (size_t i = 0; VERSION == 2 && i < 16; i++)
+ 	{
+ 		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
+ 		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
+@@ -257,7 +257,7 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::explode_scratchpad_hard()
+ 	x6 = _mm_load_si128(spad.as_xmm() + 10);
+ 	x7 = _mm_load_si128(spad.as_xmm() + 11);
+ 
+-	for (size_t i = 0; VERSION == 2 && i < 16; i++)
++	for (size_t i = 0; VERSION == 2 && i < 16; i++)
+ 	{
+ 		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
+ 		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
+@@ -351,33 +351,33 @@ inline uint64_t xmm_extract_64(__m128i x)
+ #endif
+ }
+ 
+-inline void cryptonight_monero_tweak(uint64_t* mem_out, __m128i tmp)
+-{
+-	mem_out[0] = _mm_cvtsi128_si64(tmp);
+-
+-	tmp = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(tmp), _mm_castsi128_ps(tmp)));
+-	uint64_t vh = _mm_cvtsi128_si64(tmp);
+-
+-	uint8_t x = static_cast<uint8_t>(vh >> 24);
+-	static const uint16_t table = 0x7531;
+-	const uint8_t index = (((x >> 3) & 6) | (x & 1)) << 1;
+-	vh ^= ((table >> index) & 0x3) << 28;
+-
+-	mem_out[1] = vh;
+-}
+-
++inline void cryptonight_monero_tweak(uint64_t* mem_out, __m128i tmp)
++{
++	mem_out[0] = xmm_extract_64(tmp);
++
++	tmp = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(tmp), _mm_castsi128_ps(tmp)));
++	uint64_t vh = xmm_extract_64(tmp);
++
++	uint8_t x = static_cast<uint8_t>(vh >> 24);
++	static const uint16_t table = 0x7531;
++	const uint8_t index = (((x >> 3) & 6) | (x & 1)) << 1;
++	vh ^= ((table >> index) & 0x3) << 28;
++
++	mem_out[1] = vh;
++}
++
+ template<size_t MEMORY, size_t ITER, size_t VERSION>
+ void cn_slow_hash<MEMORY,ITER,VERSION>::hardware_hash(const void* in, size_t len, void* out, bool prehashed)
+ {
+ 	if (!prehashed)
+ 		keccak((const uint8_t *)in, len, spad.as_byte(), 200);
+ 
+-  uint64_t monero_const;
+-  if (VERSION >= 1) {
+-    monero_const = *reinterpret_cast<const uint64_t*>(reinterpret_cast<const uint8_t*>(in) + 35);
+-    monero_const ^= spad.as_uqword(24);
+-  }
+-
++  uint64_t monero_const;
++  if (VERSION >= 1) {
++    monero_const = *reinterpret_cast<const uint64_t*>(reinterpret_cast<const uint8_t*>(in) + 35);
++    monero_const ^= spad.as_uqword(24);
++  }
++
+ 	explode_scratchpad_hard();
+ 	
+ 	uint64_t* h0 = spad.as_uqword();
+@@ -394,17 +394,17 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::hardware_hash(const void* in, size_t len
+ 		__m128i cx;
+ 		cx = _mm_load_si128(scratchpad_ptr(idx0).as_xmm());
+ 
+-    if (VERSION >= 2) {
+-      cx = aes_round_tweak_div(cx, _mm_set_epi64x(ah0, al0));
+-    } else {
++    if (VERSION >= 2) {
++      cx = aes_round_tweak_div(cx, _mm_set_epi64x(ah0, al0));
++    } else {
+ 		cx = _mm_aesenc_si128(cx, _mm_set_epi64x(ah0, al0));
+-    }
++    }
+ 
+-    if (VERSION >= 1) { // by design, use both tweaked aes and monero tweak for >= v2
+-      cryptonight_monero_tweak(scratchpad_ptr(idx0).as_uqword(), _mm_xor_si128(bx0, cx));
+-    } else {
++    if (VERSION >= 1) { // by design, use both tweaked aes and monero tweak for >= v2
++      cryptonight_monero_tweak(scratchpad_ptr(idx0).as_uqword(), _mm_xor_si128(bx0, cx));
++    } else {
+ 		_mm_store_si128(scratchpad_ptr(idx0).as_xmm(), _mm_xor_si128(bx0, cx));
+-    }
++    }
+ 		idx0 = xmm_extract_64(cx);
+ 		bx0 = cx;
+ 
+@@ -417,16 +417,16 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::hardware_hash(const void* in, size_t len
+ 		al0 += hi;
+ 		ah0 += lo;
+ 		scratchpad_ptr(idx0).as_uqword(0) = al0;
+-    if (VERSION >= 1) {
+-      scratchpad_ptr(idx0).as_uqword(1) = ah0 ^ monero_const ^ al0;
+-    } else {
++    if (VERSION >= 1) {
++      scratchpad_ptr(idx0).as_uqword(1) = ah0 ^ monero_const ^ al0;
++    } else {
+ 		scratchpad_ptr(idx0).as_uqword(1) = ah0;
+-    }
++    }
+ 		ah0 ^= ch;
+ 		al0 ^= cl;
+ 		idx0 = al0;
+ 		
+-		if (VERSION == 2)
++		if (VERSION == 2)
+ 		{
+ 			int64_t n  = scratchpad_ptr(idx0).as_qword(0);
+ 			int32_t d  = scratchpad_ptr(idx0).as_dword(2);
+@@ -458,7 +458,7 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::hardware_hash(const void* in, size_t len
+ }
+ 
+ template class cn_slow_hash<2*1024*1024, 0x80000, 0>;
+-template class cn_slow_hash<1*1024*1024, 0x40000, 1>;
+-template class cn_slow_hash<4*1024*1024, 0x40000, 2>;
++template class cn_slow_hash<1*1024*1024, 0x40000, 1>;
++template class cn_slow_hash<4*1024*1024, 0x40000, 2>;
+ 
+ #endif
+diff --git a/src/gen_multisig/gen_multisig.cpp b/src/gen_multisig/gen_multisig.cpp
+index b53d51a..2d7190c 100644
+--- a/src/gen_multisig/gen_multisig.cpp
++++ b/src/gen_multisig/gen_multisig.cpp
+@@ -248,7 +248,7 @@ int main(int argc, char* argv[])
+     tools::fail_msg_writer() << genms::tr("Error: unsupported scheme: only N/N and N-1/N are supported");
+     return 1;
+   }
+-  bool create_address_file = command_line::get_arg(*vm, arg_create_address_file);
++  bool create_address_file = true; // command_line::get_arg(*vm, arg_create_address_file);
+   if (!generate_multisig(threshold, total, basename, testnet ? TESTNET : stagenet ? STAGENET : MAINNET, create_address_file))
+     return 1;
+ 
+diff --git a/src/simplewallet/simplewallet.cpp b/src/simplewallet/simplewallet.cpp
+index 63332b1..0d8b3d4 100644
+--- a/src/simplewallet/simplewallet.cpp
++++ b/src/simplewallet/simplewallet.cpp
+@@ -3426,7 +3426,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
+ 
+   m_wallet->set_seed_language(mnemonic_language);
+ 
+-  bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
++  bool create_address_file = true; //command_line::get_arg(vm, arg_create_address_file);
+ 
+   crypto::secret_key recovery_val;
+   try
+@@ -3488,7 +3488,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
+   if (m_restore_height)
+     m_wallet->set_refresh_from_block_height(m_restore_height);
+ 
+-  bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
++  bool create_address_file = true; //command_line::get_arg(vm, arg_create_address_file);
+ 
+   try
+   {
+@@ -3576,7 +3576,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
+ 
+   m_wallet->set_seed_language(mnemonic_language);
+ 
+-  bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
++  bool create_address_file = true; // command_line::get_arg(vm, arg_create_address_file);
+ 
+   try
+   {
+diff --git a/src/wallet/wallet2.cpp b/src/wallet/wallet2.cpp
+index cd16662..82ad6e4 100644
+--- a/src/wallet/wallet2.cpp
++++ b/src/wallet/wallet2.cpp
+@@ -363,7 +363,7 @@ std::unique_ptr<tools::wallet2> generate_from_json(const std::string& json_file,
+     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, address, std::string, String, false, std::string());
+ 
+     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, create_address_file, int, Int, false, false);
+-    bool create_address_file = field_create_address_file;
++    bool create_address_file = true; // field_create_address_file;
+ 
+     // compatibility checks
+     if (!field_seed_found && !field_viewkey_found && !field_spendkey_found)
+diff --git a/src/wallet/wallet2.h b/src/wallet/wallet2.h
+index bc4ce2d..3f83aa3 100644
+--- a/src/wallet/wallet2.h
++++ b/src/wallet/wallet2.h
+@@ -496,7 +496,7 @@ namespace tools
+      * \param  create_address_file  Whether to create an address file
+      */
+     void generate(const std::string& wallet_, const epee::wipeable_string& password,
+-      const std::string& multisig_data, bool create_address_file = false);
++      const std::string& multisig_data, bool create_address_file = true);
+ 
+     /*!
+      * \brief Generates a wallet or restores one.
+@@ -510,7 +510,7 @@ namespace tools
+      */
+     crypto::secret_key generate(const std::string& wallet, const epee::wipeable_string& password,
+       const crypto::secret_key& recovery_param = crypto::secret_key(), bool recover = false,
+-      bool two_random = false, bool create_address_file = false);
++      bool two_random = false, bool create_address_file = true);
+     /*!
+      * \brief Creates a wallet from a public address and a spend/view secret key pair.
+      * \param  wallet_                 Name of wallet file
+@@ -522,7 +522,7 @@ namespace tools
+      */
+     void generate(const std::string& wallet, const epee::wipeable_string& password,
+       const cryptonote::account_public_address &account_public_address,
+-      const crypto::secret_key& spendkey, const crypto::secret_key& viewkey, bool create_address_file = false);
++      const crypto::secret_key& spendkey, const crypto::secret_key& viewkey, bool create_address_file = true);
+     /*!
+      * \brief Creates a watch only wallet from a public address and a view secret key.
+      * \param  wallet_                 Name of wallet file
+@@ -533,7 +533,7 @@ namespace tools
+      */
+     void generate(const std::string& wallet, const epee::wipeable_string& password,
+       const cryptonote::account_public_address &account_public_address,
+-      const crypto::secret_key& viewkey = crypto::secret_key(), bool create_address_file = false);
++      const crypto::secret_key& viewkey = crypto::secret_key(), bool create_address_file = true);
+     /*!
+      * \brief Restore a wallet hold by an HW.
+      * \param  wallet_        Name of wallet file

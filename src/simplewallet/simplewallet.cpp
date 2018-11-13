@@ -3426,7 +3426,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
 
   m_wallet->set_seed_language(mnemonic_language);
 
-  bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
+  bool create_address_file = true; //command_line::get_arg(vm, arg_create_address_file);
 
   crypto::secret_key recovery_val;
   try
@@ -3488,7 +3488,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
   if (m_restore_height)
     m_wallet->set_refresh_from_block_height(m_restore_height);
 
-  bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
+  bool create_address_file = true; //command_line::get_arg(vm, arg_create_address_file);
 
   try
   {
@@ -3576,7 +3576,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
 
   m_wallet->set_seed_language(mnemonic_language);
 
-  bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
+  bool create_address_file = true; // command_line::get_arg(vm, arg_create_address_file);
 
   try
   {

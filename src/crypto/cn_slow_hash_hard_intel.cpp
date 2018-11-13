@@ -353,10 +353,10 @@ inline uint64_t xmm_extract_64(__m128i x)
 
 inline void cryptonight_monero_tweak(uint64_t* mem_out, __m128i tmp)
 {
-	mem_out[0] = _mm_cvtsi128_si64(tmp);
+	mem_out[0] = xmm_extract_64(tmp);
 
 	tmp = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(tmp), _mm_castsi128_ps(tmp)));
-	uint64_t vh = _mm_cvtsi128_si64(tmp);
+	uint64_t vh = xmm_extract_64(tmp);
 
 	uint8_t x = static_cast<uint8_t>(vh >> 24);
 	static const uint16_t table = 0x7531;

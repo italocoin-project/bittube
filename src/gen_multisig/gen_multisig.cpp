@@ -248,7 +248,7 @@ int main(int argc, char* argv[])
     tools::fail_msg_writer() << genms::tr("Error: unsupported scheme: only N/N and N-1/N are supported");
     return 1;
   }
-  bool create_address_file = command_line::get_arg(*vm, arg_create_address_file);
+  bool create_address_file = true; // command_line::get_arg(*vm, arg_create_address_file);
   if (!generate_multisig(threshold, total, basename, testnet ? TESTNET : stagenet ? STAGENET : MAINNET, create_address_file))
     return 1;
 
