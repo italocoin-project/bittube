@@ -29,6 +29,7 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <unistd.h>
 #include <cstdio>
 
 #ifdef __GLIBC__
@@ -38,7 +39,7 @@
 #ifdef __GLIBC__
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <ustat.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
@@ -46,11 +47,19 @@
 #include <string>
 #endif
 
+//tools::is_hdd
+#ifdef __GLIBC__
+  #include <sstream>
+  #include <sys/sysmacros.h>
+  #include <fstream>
+#endif
+
 #include "unbound.h"
 
 #include "include_base_utils.h"
 #include "file_io_utils.h"
 #include "wipeable_string.h"
+#include "misc_os_dependent.h"
 using namespace epee;
 
 #include "crypto/crypto.h"
@@ -73,6 +82,32 @@ using namespace epee;
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 #include <openssl/sha.h>
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "util"
+
+namespace
+{
+
+#ifndef _WIN32
+static int flock_exnb(int fd)
+{
+  struct flock fl;
+  int ret;
+
+  memset(&fl, 0, sizeof(fl));
+  fl.l_type = F_WRLCK;
+  fl.l_whence = SEEK_SET;
+  fl.l_start = 0;
+  fl.l_len = 0;
+  ret = fcntl(fd, F_SETLK, &fl);
+  if (ret < 0)
+    MERROR("Error locking fd " << fd << ": " << errno << " (" << strerror(errno) << ")");
+  return ret;
+}
+#endif
+
+}
 
 namespace tools
 {
@@ -174,7 +209,7 @@ namespace tools
         struct stat wstats = {};
         if (fstat(fdw, std::addressof(wstats)) == 0 &&
             rstats.st_dev == wstats.st_dev && rstats.st_ino == wstats.st_ino &&
-            flock(fdw, (LOCK_EX | LOCK_NB)) == 0 && ftruncate(fdw, 0) == 0)
+            flock_exnb(fdw) == 0 && ftruncate(fdw, 0) == 0)
         {
           std::FILE* file = fdopen(fdw, "w");
           if (file) return {file, std::move(name)};
@@ -227,10 +262,10 @@ namespace tools
       MERROR("Failed to open " << filename << ": " << std::error_code(GetLastError(), std::system_category()));
     }
 #else
-    m_fd = open(filename.c_str(), O_RDONLY | O_CREAT, 0666);
+    m_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0666);
     if (m_fd != -1)
     {
-      if (flock(m_fd, LOCK_EX | LOCK_NB) == -1)
+      if (flock_exnb(m_fd) == -1)
       {
         MERROR("Failed to lock " << filename << ": " << std::strerror(errno));
         close(m_fd);
@@ -301,10 +336,19 @@ namespace tools
       StringCchCopy(pszOS, BUFSIZE, TEXT("Microsoft "));
 
       // Test for the specific product.
+      if ( osvi.dwMajorVersion == 10 )
+      {
+        if ( osvi.dwMinorVersion == 0 )
+        {
+          if( osvi.wProductType == VER_NT_WORKSTATION )
+            StringCchCat(pszOS, BUFSIZE, TEXT("Windows 10 "));
+          else StringCchCat(pszOS, BUFSIZE, TEXT("Windows Server 2016 " ));
+        }
+      }
 
       if ( osvi.dwMajorVersion == 6 )
       {
-        if( osvi.dwMinorVersion == 0 )
+        if ( osvi.dwMinorVersion == 0 )
         {
           if( osvi.wProductType == VER_NT_WORKSTATION )
             StringCchCat(pszOS, BUFSIZE, TEXT("Windows Vista "));
@@ -316,6 +360,20 @@ namespace tools
           if( osvi.wProductType == VER_NT_WORKSTATION )
             StringCchCat(pszOS, BUFSIZE, TEXT("Windows 7 "));
           else StringCchCat(pszOS, BUFSIZE, TEXT("Windows Server 2008 R2 " ));
+        }
+
+        if ( osvi.dwMinorVersion == 2 )
+        {
+          if( osvi.wProductType == VER_NT_WORKSTATION )
+            StringCchCat(pszOS, BUFSIZE, TEXT("Windows 8 "));
+          else StringCchCat(pszOS, BUFSIZE, TEXT("Windows Server 2012 " ));
+        }
+
+        if ( osvi.dwMinorVersion == 3 )
+        {
+          if( osvi.wProductType == VER_NT_WORKSTATION )
+            StringCchCat(pszOS, BUFSIZE, TEXT("Windows 8.1 "));
+          else StringCchCat(pszOS, BUFSIZE, TEXT("Windows Server 2012 R2 " ));
         }
 
         pGPI = (PGPI) GetProcAddress(
@@ -683,6 +741,36 @@ std::string get_nix_version_display_string()
   static void setup_crash_dump() {}
 #endif
 
+  bool disable_core_dumps()
+  {
+#ifdef __GLIBC__
+    // disable core dumps in release mode
+    struct rlimit rlimit;
+    rlimit.rlim_cur = rlimit.rlim_max = 0;
+    if (setrlimit(RLIMIT_CORE, &rlimit))
+    {
+      MWARNING("Failed to disable core dumps");
+      return false;
+    }
+#endif
+    return true;
+  }
+
+  ssize_t get_lockable_memory()
+  {
+#ifdef __GLIBC__
+    struct rlimit rlim;
+    if (getrlimit(RLIMIT_MEMLOCK, &rlim) < 0)
+    {
+      MERROR("Failed to determine the lockable memory limit");
+      return -1;
+    }
+    return rlim.rlim_cur;
+#else
+    return -1;
+#endif
+  }
+
   bool on_startup()
   {
     mlog_configure("", true);
@@ -718,62 +806,41 @@ std::string get_nix_version_display_string()
 #endif
   }
 
-  bool is_hdd(const char *path)
+  boost::optional<bool> is_hdd(const char *file_path)
   {
 #ifdef __GLIBC__
-    std::string device = "";
-    struct stat st, dst;
-    if (stat(path, &st) < 0)
-      return 0;
-
-    DIR *dir = opendir("/dev/block");
-    if (!dir)
-      return 0;
-    struct dirent *de;
-    while ((de = readdir(dir)))
+    struct stat st;
+    std::string prefix;
+    if(stat(file_path, &st) == 0)
     {
-      if (strcmp(de->d_name, ".") && strcmp(de->d_name, ".."))
+      std::ostringstream s;
+      s << "/sys/dev/block/" << major(st.st_dev) << ":" << minor(st.st_dev);
+      prefix = s.str();
+    }
+    else
+    {
+      return boost::none;
+    }
+    std::string attr_path = prefix + "/queue/rotational";
+    std::ifstream f(attr_path, std::ios_base::in);
+    if(not f.is_open())
+    {
+      attr_path = prefix + "/../queue/rotational";
+      f.open(attr_path, std::ios_base::in);
+      if(not f.is_open())
       {
-        std::string dev_path = std::string("/dev/block/") + de->d_name;
-        char resolved[PATH_MAX];
-        if (realpath(dev_path.c_str(), resolved) && !strncmp(resolved, "/dev/", 5))
-        {
-          if (stat(resolved, &dst) == 0)
-          {
-            if (dst.st_rdev == st.st_dev)
-            {
-              // take out trailing digits (eg, sda1 -> sda)
-              char *ptr = resolved;
-              while (*ptr)
-                ++ptr;
-              while (ptr > resolved && isdigit(*--ptr))
-                *ptr = 0;
-              device = resolved + 5;
-              break;
-            }
-          }
-        }
+          return boost::none;
       }
     }
-    closedir(dir);
-
-    if (device.empty())
-      return 0;
-
-    std::string sys_path = "/sys/block/" + device + "/queue/rotational";
-    FILE *f = fopen(sys_path.c_str(), "r");
-    if (!f)
-      return false;
-    char s[8];
-    char *ptr = fgets(s, sizeof(s), f);
-    fclose(f);
-    if (!ptr)
-      return 0;
-    s[sizeof(s) - 1] = 0;
-    int n = atoi(s); // returns 0 on parse error
-    return n == 1;
+    unsigned short val = 0xdead;
+    f >> val;
+    if(not f.fail())
+    {
+      return (val == 1);
+    }
+    return boost::none;
 #else
-    return 0;
+    return boost::none;
 #endif
   }
 
@@ -919,5 +986,82 @@ std::string get_nix_version_display_string()
     {
       return {};
     }
+  }
+
+  std::string glob_to_regex(const std::string &val)
+  {
+    std::string newval;
+
+    bool escape = false;
+    for (char c: val)
+    {
+      if (c == '*')
+        newval += escape ? "*" : ".*";
+      else if (c == '?')
+        newval += escape ? "?" : ".";
+      else if (c == '\\')
+        newval += '\\', escape = !escape;
+      else
+        newval += c;
+    }
+    return newval;
+  }
+  
+#ifdef _WIN32
+  std::string input_line_win()
+  {
+    HANDLE hConIn = CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    DWORD oldMode;
+
+    FlushConsoleInputBuffer(hConIn);
+    GetConsoleMode(hConIn, &oldMode);
+    SetConsoleMode(hConIn, ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT);
+
+    wchar_t buffer[1024];
+    DWORD read;
+
+    ReadConsoleW(hConIn, buffer, sizeof(buffer)/sizeof(wchar_t)-1, &read, nullptr);
+    buffer[read] = 0;
+
+    SetConsoleMode(hConIn, oldMode);
+    CloseHandle(hConIn);
+  
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, NULL, 0, NULL, NULL);
+    std::string buf(size_needed, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &buf[0], size_needed, NULL, NULL);
+    buf.pop_back(); //size_needed includes null that we needed to have space for
+    return buf;
+  }
+#endif
+
+  void closefrom(int fd)
+  {
+#if defined __FreeBSD__ || defined __OpenBSD__ || defined __NetBSD__ || defined __DragonFly__
+    ::closefrom(fd);
+#else
+#if defined __GLIBC__
+    const int sc_open_max =  sysconf(_SC_OPEN_MAX);
+    const int MAX_FDS = std::min(65536, sc_open_max);
+#else
+    const int MAX_FDS = 65536;
+#endif
+    while (fd < MAX_FDS)
+    {
+      close(fd);
+      ++fd;
+    }
+#endif
+  }
+
+  std::string get_human_readable_timestamp(uint64_t ts)
+  {
+    char buffer[64];
+    if (ts < 1234567890)
+      return "<unknown>";
+    time_t tt = ts;
+    struct tm tm;
+    misc_utils::get_gmt_time(tt, tm);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+    return std::string(buffer);
   }
 }

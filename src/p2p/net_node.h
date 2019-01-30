@@ -39,7 +39,9 @@
 
 #include "cryptonote_config.h"
 #include "warnings.h"
-#include "net/levin_server_cp2.h"
+#include "net/abstract_tcp_server2.h"
+#include "net/levin_protocol_handler.h"
+#include "net/levin_protocol_handler_async.h"
 #include "p2p_protocol_defs.h"
 #include "storages/levin_abstract_invoke2.h"
 #include "net_peerlist.h"
@@ -179,10 +181,10 @@ namespace nodetool
     virtual void on_connection_close(p2p_connection_context& context);
     virtual void callback(p2p_connection_context& context);
     //----------------- i_p2p_endpoint -------------------------------------------------------------
-    virtual bool relay_notify_to_list(int command, const std::string& data_buff, const std::list<boost::uuids::uuid> &connections);
-    virtual bool relay_notify_to_all(int command, const std::string& data_buff, const epee::net_utils::connection_context_base& context);
-    virtual bool invoke_command_to_peer(int command, const std::string& req_buff, std::string& resp_buff, const epee::net_utils::connection_context_base& context);
-    virtual bool invoke_notify_to_peer(int command, const std::string& req_buff, const epee::net_utils::connection_context_base& context);
+    virtual bool relay_notify_to_list(int command, const epee::span<const uint8_t> data_buff, const std::list<boost::uuids::uuid> &connections);
+    virtual bool relay_notify_to_all(int command, const epee::span<const uint8_t> data_buff, const epee::net_utils::connection_context_base& context);
+    virtual bool invoke_command_to_peer(int command, const epee::span<const uint8_t> req_buff, std::string& resp_buff, const epee::net_utils::connection_context_base& context);
+    virtual bool invoke_notify_to_peer(int command, const epee::span<const uint8_t> req_buff, const epee::net_utils::connection_context_base& context);
     virtual bool drop_connection(const epee::net_utils::connection_context_base& context);
     virtual void request_callback(const epee::net_utils::connection_context_base& context);
     virtual void for_each_connection(std::function<bool(typename t_payload_net_handler::connection_context&, peerid_type, uint32_t)> f);
@@ -196,12 +198,12 @@ namespace nodetool
         const boost::program_options::variables_map& vm
       );
     bool idle_worker();
-    bool handle_remote_peerlist(const std::list<peerlist_entry>& peerlist, time_t local_time, const epee::net_utils::connection_context_base& context);
+    bool handle_remote_peerlist(const std::vector<peerlist_entry>& peerlist, time_t local_time, const epee::net_utils::connection_context_base& context);
     bool get_local_node_data(basic_node_data& node_data);
     //bool get_local_handshake_data(handshake_data& hshd);
 
-    bool merge_peerlist_with_local(const std::list<peerlist_entry>& bs);
-    bool fix_time_delta(std::list<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
+    bool merge_peerlist_with_local(const std::vector<peerlist_entry>& bs);
+    bool fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
 
     bool connections_maker();
     bool peer_sync_idle_maker();
@@ -309,7 +311,7 @@ namespace nodetool
     epee::math_helper::once_a_time_seconds<1> m_connections_maker_interval;
     epee::math_helper::once_a_time_seconds<60*30, false> m_peerlist_store_interval;
     epee::math_helper::once_a_time_seconds<60> m_gray_peerlist_housekeeping_interval;
-    epee::math_helper::once_a_time_seconds<900, false> m_incoming_connections_interval;
+    epee::math_helper::once_a_time_seconds<3600, false> m_incoming_connections_interval;
 
     std::string m_bind_ip;
     std::string m_port;
@@ -338,8 +340,8 @@ namespace nodetool
     cryptonote::network_type m_nettype;
   };
 
-    const int64_t default_limit_up = 2048;    // kB/s
-    const int64_t default_limit_down = 8192;  // kB/s
+    const int64_t default_limit_up = P2P_DEFAULT_LIMIT_RATE_UP;      // kB/s
+    const int64_t default_limit_down = P2P_DEFAULT_LIMIT_RATE_DOWN;  // kB/s
     extern const command_line::arg_descriptor<std::string> arg_p2p_bind_ip;
     extern const command_line::arg_descriptor<std::string, false, true, 2> arg_p2p_bind_port;
     extern const command_line::arg_descriptor<uint32_t>    arg_p2p_external_port;

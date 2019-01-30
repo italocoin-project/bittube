@@ -36,7 +36,7 @@
 #include <vector>
 #include <boost/math/special_functions/round.hpp>
 
-#include "common/int-util.h"
+#include "int-util.h"
 #include "crypto/hash.h"
 #include "cryptonote_config.h"
 #include "difficulty.h"
@@ -217,7 +217,10 @@ namespace cryptonote {
       solvetime = timestamps[i] - timestamps[i - 1];
 
       if (solvetime > 10 * T) { solvetime = 10 * T; }
+    if (height < 268001)
+      {
       if (solvetime < -(5 * T)) { solvetime = -(5 * T); }
+    }
 
       j = j + 1;
       w += solvetime * j;

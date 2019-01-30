@@ -35,11 +35,6 @@ if (WIN32 OR STATIC)
   add_definitions(-DMINIUPNP_STATICLIB)
 endif ()
 
-# warnings are cleared only for GCC on Linux
-if (NOT (MINGW OR APPLE OR FREEBSD OR OPENBSD OR DRAGONFLY))
-  add_compile_options("${WARNINGS_AS_ERRORS_FLAG}") # applies only to targets that follow
-endif()
-
 function (monero_private_headers group)
   source_group("${group}\\Private"
     FILES
@@ -125,10 +120,10 @@ if(NOT IOS)
   add_subdirectory(p2p)
 endif()
 add_subdirectory(cryptonote_protocol)
+add_subdirectory(daemonizer)
 if(NOT IOS)
   add_subdirectory(simplewallet)
   add_subdirectory(gen_multisig)
-  add_subdirectory(daemonizer)
   add_subdirectory(daemon)
   add_subdirectory(blockchain_utilities)
 endif()
@@ -142,3 +137,4 @@ if(PER_BLOCK_CHECKPOINT)
 endif()
 
 add_subdirectory(device)
+add_subdirectory(device_trezor)

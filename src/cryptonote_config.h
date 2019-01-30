@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <stdexcept>
 #include <string>
 #include <boost/uuid/uuid.hpp>
 
@@ -72,12 +73,13 @@
 // COIN - number of smallest units in one coin
 #define COIN                                            ((uint64_t)100000000) // pow(10, 8)
 
-#define LEGACY_MINIMUM_FEE								((uint64_t)100000)
+#define LEGACY_MINIMUM_FEE								              ((uint64_t)100000)
 #define FEE_PER_KB_OLD                                  ((uint64_t)100000) // pow(10, 5)
 #define FEE_PER_KB                                      ((uint64_t)100000) // pow(10, 5)
 #define DYNAMIC_FEE_PER_KB_BASE_FEE                     ((uint64_t)200000) // 2 * pow(10, 5)
 #define DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD            ((uint64_t)45000000000) // 450 * pow(10, 8)
 #define DYNAMIC_FEE_PER_KB_BASE_FEE_V5                  ((uint64_t)200000 * (uint64_t)CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2 / CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5)
+#define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT        ((uint64_t)3000)
 
 #define ORPHANED_BLOCKS_MAX_COUNT                       100
 
@@ -101,7 +103,7 @@
 
 
 #define BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT          10000  //by default, blocks ids count in synchronizing
-#define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT_PRE_V4       20     //by default, blocks count in blocks downloading
+#define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT_PRE_V4       100     //by default, blocks count in blocks downloading
 #define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT              20     //by default, blocks count in blocks downloading
 
 #define CRYPTONOTE_MEMPOOL_TX_LIVETIME                    (86400*3) //seconds, three days
@@ -112,7 +114,7 @@
 #define P2P_LOCAL_WHITE_PEERLIST_LIMIT                  1000
 #define P2P_LOCAL_GRAY_PEERLIST_LIMIT                   5000
 
-#define P2P_DEFAULT_CONNECTIONS_COUNT                   32
+#define P2P_DEFAULT_CONNECTIONS_COUNT                   8
 #define P2P_DEFAULT_HANDSHAKE_INTERVAL                  60           //secondes
 #define P2P_DEFAULT_PACKET_MAX_SIZE                     50000000     //50000000 bytes maximum packet size
 #define P2P_DEFAULT_PEERS_IN_HANDSHAKE                  250
@@ -122,6 +124,8 @@
 #define P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT            5000       //5 seconds
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_DEFAULT_ANCHOR_CONNECTIONS_COUNT            2
+#define P2P_DEFAULT_LIMIT_RATE_UP                       2048       // kB/s
+#define P2P_DEFAULT_LIMIT_RATE_DOWN                     8192       // kB/s
 
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*60)     //1 hour
 #define P2P_IP_BLOCKTIME                                (60*60*24)  //24 hour
@@ -145,17 +149,24 @@
 #define HF_VERSION_DYNAMIC_FEE                  4
 #define HF_VERSION_DEV_REWARD                   4
 #define HF_VERSION_AIRTIME_REWARD               5
+#define HF_VERSION_COMMUNITY_DEVS               6
+#define HF_VERSION_COMMUNITY_MODS               6
+#define HF_VERSION_COMMUNITY_REF                6
 #define HF_VERSION_POW_VARIANT1                 3
 #define HF_VERSION_POW_VARIANT2                 4
 #define HF_VERSION_MIN_MIXIN_2                  4
 #define HF_VERSION_ENFORCE_RCT                  4
 #define HF_VERSION_BULLETPROOF                  5
+#define HF_VERSION_PER_BYTE_FEE                 6 //TODO
+#define HF_VERSION_PADDED_BULLETS               6 //TODO
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 
 #define HASH_OF_HASHES_STEP                     256
 
-#define DEFAULT_TXPOOL_MAX_SIZE                 648000000ull // 3 days at 300000, in bytes
+#define DEFAULT_TXPOOL_MAX_WEIGHT               648000000ull // 3 days at 300000, in bytes
+
+#define BULLETPROOF_MAX_OUTPUTS                 16
 
 // New constants are intended to go here
 namespace config
@@ -181,7 +192,10 @@ namespace config
   std::string const DEVELOPMENT_WALLET_ADDRESS = "bxdaNPkW77u6KYJuYNDSJpfocTXjVpZ7mMAsoNELySdnbAr8U6aMvnULosC456Kk7NRCAS2Xe7o14NF7bbPKyVta39KPYFia3";
   std::string const MARKETING_WALLET_ADDRESS = "bxdEc4zm1g2ZQZkSwjYThuMJouTSfzL2xJXTC2o4q7Dq17sEcsMdwgRfNuBgg59TPCLJwCj4jJH7rT8bdKjx5p6Z35LJDknWU";
   std::string const AIRTIME_WALLET_ADDRESS = "bxcfouydX4Q2jxw2Thx49bM7tmBiEhP7c8rUoXSVmYxxDpEqqSpBzdRe9WQDkg5LekBtX9W9XinTuG6ttKBtBnpT14KNegFD1"; // view key d6809b482464de15defbbb4127a94118c2ebf77997f45a496863a7266b1406a9
-
+  std::string const COMMUNITY_DEVS_WALLET_ADDRESS = "bxdpg2rivP4g1PzBsm9nq3YXU2V3kDcmogGPxeGvdsup4DBLzdHqW3bEmepzhzS6RPgye1MbiGVbq95UbZxPN19531E9YPMta";
+  std::string const COMMUNITY_MODS_WALLET_ADDRESS = "bxdKezUkPt4aci2PqZrEp7gqzkG3e7UC2R7zLn3Bd6dh1NhwRHPuXiB17uejH22dLh2qxj6mVVVZjTvGkbSSthbo2PeM429FW";
+  std::string const COMMUNITY_REF_WALLET_ADDRESS = "bxbuTE8eqwtXvQJEoNiDDPXoTExxuLu6igJsEbFuMQ4nBJgSYXHUR9u3PG26UrFZeYJ9d2uyPp28DgUm7SaXwA9u2uirzK4Ef";
+  
   namespace testnet
   {
     uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 0xd1;
@@ -200,6 +214,9 @@ namespace config
     std::string const DEVELOPMENT_WALLET_ADDRESS = "bxc8aUkTt6q3wjN3zE4v85ZvYaBnMxTL3ZJ7VGh1jUqKSciCPSo2oo1eZhV1MDbyN3LLFZ8JsuMGLPg8MRFYtaFE27WTuFo52"; //Mnemonic: saxophone donuts jobs mocked boxes cuisine rhythm devoid pawnshop reheat does ditch jeans elope pepper psychic mugged heron butter binocular island answers tiger toaster boxes
     std::string const MARKETING_WALLET_ADDRESS = "bxcu1pvpaesG6gp4gTcFoc1dxofNLwn6X3KhgWp4r5cr6e5Lun98PrL2vtyFLULVH74PNyLHDb6ovDoZQWsm55hz3BHgREmd3"; //Mnemonic: roomy rudely tagged taunts sadness needed hive gave upgrade fitting nerves lipstick gawk juvenile tuesday bobsled identity bomb suede toenail ember winter cuisine dizzy toenail
     std::string const AIRTIME_WALLET_ADDRESS = "bxcrzjfBngtjdxEmc7PoaiXWZbXZQjnEyNWSmAG5zwDJTqgtoQPTiwPSgFaPXLZsVCFPrmyeDDmMWcdSj2k6Txb42d81UZ7wF"; //Mnemonic: weird doing laptop mixture nocturnal myth cigar pyramid dual ruffled pimple fences veered punch sieve august cottage lids lakes waveform patio ability lettuce lied ruffled
+    std::string const COMMUNITY_DEVS_WALLET_ADDRESS = "bxcmCVeX65oe6hV4UHPYuBWo7fTC6jMUkJpLUrakrSavNgZLfgUMEKpgksTkShgQcY1wRzfGYV5MsRPQbSeFRUYU2Vj2Bt1BJ"; //TODO
+    std::string const COMMUNITY_MODS_WALLET_ADDRESS = "bxcmCVeX65oe6hV4UHPYuBWo7fTC6jMUkJpLUrakrSavNgZLfgUMEKpgksTkShgQcY1wRzfGYV5MsRPQbSeFRUYU2Vj2Bt1BJ"; //TODO
+    std::string const COMMUNITY_REF_WALLET_ADDRESS = "bxcmCVeX65oe6hV4UHPYuBWo7fTC6jMUkJpLUrakrSavNgZLfgUMEKpgksTkShgQcY1wRzfGYV5MsRPQbSeFRUYU2Vj2Bt1BJ"; //TODO
   }
 
   namespace stagenet
@@ -219,6 +236,9 @@ namespace config
     std::string const DEVELOPMENT_WALLET_ADDRESS = "bxcGifhyYCZH9SyAkEizkmUTRD6zjAJsWiua5zsXeyGyB1i2dyzGu4hZhUixhetA8jXzqSffetDEBahXX98jB2jb2DvBvPfDS"; //Mnemonic: megabyte digit were reruns slug wetsuit ignore narrate budget adrenalin chlorine wiggle wield veteran himself sample yanks muzzle jogger owls peaches easy fancy geek narrate
     std::string const MARKETING_WALLET_ADDRESS = "bxd76ATsNNy6Jt2dQ9kaz14P7wrjFL5h54HGzEY55VvHLoA5Qpuw23S2TY3gkw4atqbHjUJd7r95cHUWchiBqHGG2DQsuAHbJ"; //Mnemonic: karate jury torch jewels coal inline inwardly seventh kitchens viking afloat liquid oozed utility duties ozone drinks syllabus weird lunar yodel liquid wetsuit afar coal
     std::string const AIRTIME_WALLET_ADDRESS = "bxdEqBAAgJcSBj7fSRvsEQUsVgC2eBz87FyFDxDrBSPxY7UQYdfgvQJ72hwC56k6p76chVZuoEQ2RXN85wpjTbJE2gffyT3wz"; //Mnemonic: artistic waist eden prying roles lamb already unnoticed twofold vaults aptitude school gels eagle lobster pledge symptoms solved tarnished laptop vaults afield zesty affair afield
+    std::string const COMMUNITY_DEVS_WALLET_ADDRESS = "bxcmCVeX65oe6hV4UHPYuBWo7fTC6jMUkJpLUrakrSavNgZLfgUMEKpgksTkShgQcY1wRzfGYV5MsRPQbSeFRUYU2Vj2Bt1BJ"; //TODO
+    std::string const COMMUNITY_MODS_WALLET_ADDRESS = "bxcmCVeX65oe6hV4UHPYuBWo7fTC6jMUkJpLUrakrSavNgZLfgUMEKpgksTkShgQcY1wRzfGYV5MsRPQbSeFRUYU2Vj2Bt1BJ"; //TODO
+    std::string const COMMUNITY_REF_WALLET_ADDRESS = "bxcmCVeX65oe6hV4UHPYuBWo7fTC6jMUkJpLUrakrSavNgZLfgUMEKpgksTkShgQcY1wRzfGYV5MsRPQbSeFRUYU2Vj2Bt1BJ"; //TODO
   }
 }
 

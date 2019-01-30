@@ -1078,8 +1078,10 @@ skip:
               if(tvc[i].m_verifivation_failed)
               {
                 if (!m_p2p->for_connection(span_connection_id, [&](cryptonote_connection_context& context, nodetool::peerid_type peer_id, uint32_t f)->bool{
+                  cryptonote::transaction tx;
+                  parse_and_validate_tx_from_blob(*it, tx); // must succeed if we got here
                   LOG_ERROR_CCONTEXT("transaction verification failed on NOTIFY_RESPONSE_GET_OBJECTS, tx_id = "
-                      << epee::string_tools::pod_to_hex(get_blob_hash(*it)) << ", dropping connection");
+                      << epee::string_tools::pod_to_hex(cryptonote::get_transaction_hash(tx)) << ", dropping connection");
                   drop_connection(context, false, true);
                   return 1;
                 }))
@@ -1169,8 +1171,20 @@ skip:
                 + " blocks/sec), " + std::to_string(m_block_queue.get_data_size() / 1048576.f) + " MB queued";
             if (ELPP->vRegistry()->allowed(el::Level::Debug, "sync-info"))
               timing_message += std::string(": ") + m_block_queue.get_overview();
-            MGINFO_YELLOW(context << " Synced " << m_core.get_current_blockchain_height() << "/" << m_core.get_target_blockchain_height()
+            if(m_core.get_target_blockchain_height() == 0){
+              MGINFO_YELLOW(context << " Synced " << m_core.get_current_blockchain_height() << "/" << m_core.get_target_blockchain_height()
                 << timing_message);
+            } else {
+              const int completition_percent = (m_core.get_current_blockchain_height() * 100 / m_core.get_target_blockchain_height());
+              if(completition_percent < 99) {//printing completion percent only if % is < of 99 cause for 99 >= this is useless
+                MGINFO_YELLOW(context << " Synced " << m_core.get_current_blockchain_height() << "/" << m_core.get_target_blockchain_height()
+                  << " (" << completition_percent << "% " << (m_core.get_target_blockchain_height() - m_core.get_current_blockchain_height())
+                  << " blocks remaining)" << timing_message);
+              } else {
+                MGINFO_YELLOW(context << " Synced " << m_core.get_current_blockchain_height() << "/" << m_core.get_target_blockchain_height()
+                  << timing_message);
+              }
+            }
           }
         }
       }
@@ -1197,6 +1211,7 @@ skip:
   bool t_cryptonote_protocol_handler<t_core>::on_idle()
   {
     m_idle_peer_kicker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::kick_idle_peers, this));
+    m_standby_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::check_standby_peers, this));
     return m_core.on_idle();
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -1228,6 +1243,22 @@ skip:
         return true;
       });
     }
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  bool t_cryptonote_protocol_handler<t_core>::check_standby_peers()
+  {
+    m_p2p->for_each_connection([&](cryptonote_connection_context& context, nodetool::peerid_type peer_id, uint32_t support_flags)->bool
+    {
+      if (context.m_state == cryptonote_connection_context::state_standby)
+      {
+        LOG_PRINT_CCONTEXT_L2("requesting callback");
+        ++context.m_callback_request_count;
+        m_p2p->request_callback(context);
+      }
+      return true;
+    });
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -1325,14 +1356,13 @@ skip:
     bool start_from_current_chain = false;
     if (!force_next_span)
     {
-      bool first = true;
-      while (1)
+      do
       {
         size_t nblocks = m_block_queue.get_num_filled_spans();
         size_t size = m_block_queue.get_data_size();
         if (nblocks < BLOCK_QUEUE_NBLOCKS_THRESHOLD || size < BLOCK_QUEUE_SIZE_THRESHOLD)
         {
-          if (!first)
+          if (context.m_state != cryptonote_connection_context::state_standby)
           {
             LOG_DEBUG_CC(context, "Block queue is " << nblocks << " and " << size << ", resuming");
           }
@@ -1355,10 +1385,9 @@ skip:
           break;
         }
 
-        if (first)
+        if (context.m_state != cryptonote_connection_context::state_standby)
         {
           LOG_DEBUG_CC(context, "Block queue is " << nblocks << " and " << size << ", pausing");
-          first = false;
           context.m_state = cryptonote_connection_context::state_standby;
         }
 
@@ -1372,13 +1401,8 @@ skip:
           return true;
         }
 
-        for (size_t n = 0; n < 50; ++n)
-        {
-          if (m_stopping)
-            return true;
-          boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
-        }
-      }
+        return true;
+      } while(0);
       context.m_state = cryptonote_connection_context::state_synchronizing;
     }
 
@@ -1672,11 +1696,6 @@ skip:
     fluffy_arg.b = arg.b;
     fluffy_arg.b.txs = fluffy_txs;
 
-    // pre-serialize them
-    std::string fullBlob, fluffyBlob;
-    epee::serialization::store_t_to_binary(arg, fullBlob);
-    epee::serialization::store_t_to_binary(fluffy_arg, fluffyBlob);
-
     // sort peers between fluffy ones and others
     std::list<boost::uuids::uuid> fullConnections, fluffyConnections;
     m_p2p->for_each_connection([this, &exclude_context, &fullConnections, &fluffyConnections](connection_context& context, nodetool::peerid_type peer_id, uint32_t support_flags)
@@ -1698,8 +1717,18 @@ skip:
     });
 
     // send fluffy ones first, we want to encourage people to run that
-    m_p2p->relay_notify_to_list(NOTIFY_NEW_FLUFFY_BLOCK::ID, fluffyBlob, fluffyConnections);
-    m_p2p->relay_notify_to_list(NOTIFY_NEW_BLOCK::ID, fullBlob, fullConnections);
+    if (!fluffyConnections.empty())
+    {
+      std::string fluffyBlob;
+      epee::serialization::store_t_to_binary(fluffy_arg, fluffyBlob);
+      m_p2p->relay_notify_to_list(NOTIFY_NEW_FLUFFY_BLOCK::ID, epee::strspan<uint8_t>(fluffyBlob), fluffyConnections);
+    }
+    if (!fullConnections.empty())
+    {
+      std::string fullBlob;
+      epee::serialization::store_t_to_binary(arg, fullBlob);
+      m_p2p->relay_notify_to_list(NOTIFY_NEW_BLOCK::ID, epee::strspan<uint8_t>(fullBlob), fullConnections);
+    }
 
     return true;
   }
@@ -1708,8 +1737,39 @@ skip:
   bool t_cryptonote_protocol_handler<t_core>::relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, cryptonote_connection_context& exclude_context)
   {
     // no check for success, so tell core they're relayed unconditionally
+    const bool pad_transactions = m_core.pad_transactions();
+    size_t bytes = pad_transactions ? 9 /* header */ + 4 /* 1 + 'txs' */ + tools::get_varint_data(arg.txs.size()).size() : 0;
     for(auto tx_blob_it = arg.txs.begin(); tx_blob_it!=arg.txs.end(); ++tx_blob_it)
+    {
       m_core.on_transaction_relayed(*tx_blob_it);
+      if (pad_transactions)
+        bytes += tools::get_varint_data(tx_blob_it->size()).size() + tx_blob_it->size();
+    }
+
+    if (pad_transactions)
+    {
+      // stuff some dummy bytes in to stay safe from traffic volume analysis
+      static constexpr size_t granularity = 1024;
+      size_t padding = granularity - bytes % granularity;
+      const size_t overhead = 2 /* 1 + '_' */ + tools::get_varint_data(padding).size();
+      if (overhead > padding)
+        padding = 0;
+      else
+        padding -= overhead;
+      arg._ = std::string(padding, ' ');
+
+      std::string arg_buff;
+      epee::serialization::store_t_to_binary(arg, arg_buff);
+
+      // we probably lowballed the payload size a bit, so added a but too much. Fix this now.
+      size_t remove = arg_buff.size() % granularity;
+      if (remove > arg._.size())
+        arg._.clear();
+      else
+        arg._.resize(arg._.size() - remove);
+      // if the size of _ moved enough, we might lose byte in size encoding, we don't care
+    }
+
     return relay_post_notify<NOTIFY_NEW_TRANSACTIONS>(arg, exclude_context);
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -1722,9 +1782,9 @@ skip:
     if (add_fail)
       m_p2p->add_host_fail(context.m_remote_address);
 
-    m_p2p->drop_connection(context);
-
     m_block_queue.flush_spans(context.m_connection_id, flush_all_spans);
+
+    m_p2p->drop_connection(context);
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>
@@ -1754,3 +1814,4 @@ skip:
     m_core.stop();
   }
 } // namespace
+
