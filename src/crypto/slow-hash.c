@@ -1574,9 +1574,4 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
 #endif
 }
 
-#ifdef FORCE_USE_HEAP
-  free(long_state);
-#endif
-}
-
 #endif
