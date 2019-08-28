@@ -701,7 +701,7 @@ namespace service_nodes
 	bool service_node_list::validate_miner_tx(const crypto::hash& prev_id, const cryptonote::transaction& miner_tx, uint64_t height, int hard_fork_version, uint64_t base_reward) const
 	{
 		std::lock_guard<boost::recursive_mutex> lock(m_sn_mutex);
-		if (hard_fork_version < 5)
+		if (hard_fork_version < HF_VERSION_POS) //TODO Bittube
 			return true;
 
 		uint64_t total_service_node_reward = cryptonote::get_service_node_reward(height, base_reward, hard_fork_version);
