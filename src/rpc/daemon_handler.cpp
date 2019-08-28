@@ -2,21 +2,21 @@
 // Copyright (c) 2018, The BitTube Project
 // 
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -182,7 +182,7 @@ namespace rpc
     // if any missing from blockchain, check in tx pool
     if (!missed_vec.empty())
     {
-      std::vector<cryptonote::transaction> pool_txs;
+      std::list<cryptonote::transaction> pool_txs;
 
       m_core.get_pool_transactions(pool_txs);
 
@@ -212,7 +212,7 @@ namespace rpc
 
       res.txs.emplace(found_hashes[i], std::move(info));
     }
-                                      
+
     res.missed_hashes = std::move(missed_vec);
     res.status = Message::STATUS_OK;
   }
@@ -344,6 +344,11 @@ namespace rpc
         if (!res.error_details.empty()) res.error_details += " and ";
         res.error_details = "tx is not ringct";
       }
+      if (tvc.m_invalid_version)
+   {
+     if (!res.error_details.empty()) res.error_details += " and ";
+     res.error_details = "tx is not version 2 or later";
+   }
       if (res.error_details.empty())
       {
         res.error_details = "an unknown issue was found with the transaction";
@@ -484,7 +489,7 @@ namespace rpc
     const cryptonote::miner& lMiner = m_core.get_miner();
     res.active = lMiner.is_mining();
     res.is_background_mining_enabled = lMiner.get_is_background_mining_enabled();
-    
+
     if ( lMiner.is_mining() ) {
       res.speed = lMiner.get_speed();
       res.threads_count = lMiner.get_threads_count();

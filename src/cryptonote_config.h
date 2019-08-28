@@ -59,6 +59,27 @@
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW_V2            11
 
+
+#define STAKING_REQUIREMENT_LOCK_BLOCKS_EXCESS          20
+#define STAKING_REQUIREMENT_LOCK_BLOCKS                 (30*24*30)
+#define STAKING_REQUIREMENT_LOCK_BLOCKS_TESTNET         (30*24*2)
+#define STAKING_RELOCK_WINDOW_BLOCKS                    (30*6)
+#define STAKING_PORTIONS                                UINT64_C(0xfffffffffffffffc)
+#define STAKING_AUTHORIZATION_EXPIRATION_WINDOW         (60*60*24*7*2)  // 2 weeks
+#define STAKING_AUTHORIZATION_EXPIRATION_AUTOSTAKE      (60*60*24*365*2) // 2 years
+#define MAX_NUMBER_OF_CONTRIBUTORS                      4
+#define MIN_PORTIONS                                    (STAKING_PORTIONS / MAX_NUMBER_OF_CONTRIBUTORS)
+#define MEMPOOL_PRUNE_DEREGISTER_LIFETIME               (2 * 60 * 60) // seconds, 2 hours
+
+static_assert(STAKING_PORTIONS % MAX_NUMBER_OF_CONTRIBUTORS == 0, "Use a multiple of four, so that it divides easily by max number of contributors.");
+static_assert(STAKING_PORTIONS % 2 == 0, "Use a multiple of two, so that it divides easily by two contributors.");
+static_assert(STAKING_PORTIONS % 3 == 0, "Use a multiple of three, so that it divides easily by three contributors.");
+
+#define UPTIME_PROOF_BUFFER_IN_SECONDS                  (5*60)
+#define UPTIME_PROOF_FREQUENCY_IN_SECONDS               (60*60)
+#define UPTIME_PROOF_MAX_TIME_IN_SECONDS                (UPTIME_PROOF_FREQUENCY_IN_SECONDS * 2 + UPTIME_PROOF_BUFFER_IN_SECONDS)
+
+
 // MONEY_SUPPLY - total number coins to be generated
 #define MONEY_SUPPLY                                    ((uint64_t)(100000000000000000))
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (22)
@@ -166,6 +187,7 @@
 #define HF_VERSION_PADDED_BULLETS               6
 #define HF_VERSION_SMALLER_BP                   8 //TODO v8?
 #define HF_VERSION_LONG_TERM_BLOCK_WEIGHT       8 //TODO v8?
+#define HF_VERSION_POS                          8 //TODO v8?
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 

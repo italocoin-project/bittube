@@ -2,21 +2,21 @@
 // Copyright (c) 2018, The BitTube Project
 // 
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -26,7 +26,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -170,6 +170,13 @@ namespace cryptonote
   {
 
   public:
+    enum version
+    {
+      version_0 = 0,
+      version_1,
+      version_2,
+      version_3_per_output_unlock_times,
+    };
     // tx information
     size_t   version;
     uint64_t unlock_time;  //number of block (or time), used as a limitation like: spend this tx not early then block/time
@@ -179,12 +186,21 @@ namespace cryptonote
     //extra
     std::vector<uint8_t> extra;
 
+    std::vector<uint64_t> output_unlock_times;
+   bool is_deregister; //service node deregister tx
+
     BEGIN_SERIALIZE()
       VARINT_FIELD(version)
+      if (version > 2)
+   {
+     FIELD(output_unlock_times)
+     FIELD(is_deregister)
+   }
       if((version == 0 || CURRENT_TRANSACTION_VERSION < version) && !is_mm_tx) return false;
       VARINT_FIELD(unlock_time)
       FIELD(vin)
       FIELD(vout)
+      if (version >= 3 && vout.size() != output_unlock_times.size()) return false;
       FIELD(extra)
     END_SERIALIZE()
 
@@ -198,6 +214,19 @@ namespace cryptonote
       vout.clear();
       extra.clear();
     }
+    uint64_t get_unlock_time(size_t out_index) const
+   {
+     if (version >= version_3_per_output_unlock_times)
+     {
+       if (out_index >= output_unlock_times.size())
+       {
+         LOG_ERROR("Tried to get unlock time of a v3 transaction with missing output unlock time");
+         return unlock_time;
+       }
+       return output_unlock_times[out_index];
+     }
+     return unlock_time;
+   }
   };
 
   class transaction: public transaction_prefix
@@ -232,6 +261,7 @@ namespace cryptonote
     void set_blob_size_valid(bool v) const { blob_size_valid.store(v,std::memory_order_release); }
     void set_hash(const crypto::hash &h) { hash = h; set_hash_valid(true); }
     void set_blob_size(size_t sz) { blob_size = sz; set_blob_size_valid(true); }
+    bool is_deregister_tx() const { return (version >= version_3_per_output_unlock_times) && is_deregister; }
 
     BEGIN_SERIALIZE_OBJECT()
       if (!typename Archive<W>::is_saving())
@@ -357,7 +387,15 @@ namespace cryptonote
   void transaction::set_null()
   {
     transaction_prefix::set_null();
+    version = 1;
+    unlock_time = 0;
+    output_unlock_times.clear();
+    is_deregister = false;
+    vin.clear();
+    vout.clear();
+    extra.clear();
     signatures.clear();
+	rct_signatures = {};
     rct_signatures.type = rct::RCTTypeNull;
     set_hash_valid(false);
     set_blob_size_valid(false);

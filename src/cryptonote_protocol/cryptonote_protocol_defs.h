@@ -2,21 +2,21 @@
 // Copyright (c) 2018, The BitTube Project
 // 
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -26,7 +26,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -35,6 +35,8 @@
 #include "serialization/keyvalue_serialization.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/blobdatatype.h"
+#include "cryptonote_core/service_node_deregister.h"
+
 namespace cryptonote
 {
 
@@ -71,10 +73,10 @@ namespace cryptonote
 
 	uint64_t avg_download;
 	uint64_t current_download;
-	
+
 	uint64_t avg_upload;
 	uint64_t current_upload;
-  
+
 	uint32_t support_flags;
 
 	std::string connection_id;
@@ -257,7 +259,7 @@ namespace cryptonote
     };
     typedef epee::misc_utils::struct_init<request_t> request;
   };
-  
+
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
@@ -288,16 +290,50 @@ namespace cryptonote
     struct request_t
     {
       crypto::hash block_hash;
-      uint64_t current_blockchain_height;      
+      uint64_t current_blockchain_height;
       std::vector<uint64_t> missing_tx_indices;
-      
+
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_VAL_POD_AS_BLOB(block_hash)
         KV_SERIALIZE(current_blockchain_height)
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(missing_tx_indices)
       END_KV_SERIALIZE_MAP()
     };
-    typedef epee::misc_utils::struct_init<request_t> request;
+  typedef epee::misc_utils::struct_init<request_t> request;
   }; 
-    
+  /************************************************************************/
+   /*                                                                      */
+   /************************************************************************/
+   struct NOTIFY_NEW_DEREGISTER_VOTE
+   {
+     const static int ID = BC_COMMANDS_POOL_BASE + 10;
+
+     struct request
+     {
+       std::vector<bittube::service_node_deregister::vote> votes;
+       BEGIN_KV_SERIALIZE_MAP()
+         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(votes)
+       END_KV_SERIALIZE_MAP()
+     };
+   };
+   /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
+  struct NOTIFY_UPTIME_PROOF
+  {
+    const static int ID = BC_COMMANDS_POOL_BASE + 11;
+
+    struct request
+    {
+      uint64_t timestamp;
+      crypto::public_key pubkey;
+      crypto::signature sig;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(timestamp)
+        KV_SERIALIZE_VAL_POD_AS_BLOB(pubkey)
+        KV_SERIALIZE_VAL_POD_AS_BLOB(sig)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 }
