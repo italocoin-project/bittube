@@ -825,7 +825,7 @@ namespace cryptonote
      * @param height Block height to deterministically recreate the quorum list from
      * @return Null shared ptr if quorum has not been determined yet for height
      */
-    const std::shared_ptr<service_nodes::quorum_state> get_quorum_state(uint64_t height) const;
+	 const std::shared_ptr<const service_nodes::quorum_state> get_quorum_state(uint64_t height) const;
 	/**
 	* @brief Get a snapshot of the service node list state at the time of the call.
 	*
@@ -834,6 +834,14 @@ namespace cryptonote
 	* @return All the service nodes that can be matched from pubkeys in param
 	*/
 	std::vector<service_nodes::service_node_pubkey_info> get_service_node_list_state(const std::vector<crypto::public_key>& service_node_pubkeys) const;
+	/**
+	* @brief get whether `pubkey` is known as a service node
+	*
+	* @param pubkey the public key to test
+	*
+	* @return whether `pubkey` is known as a service node
+	*/
+	bool is_service_node(const crypto::public_key& pubkey) const;
     /**
      * @brief Add a vote to deregister a service node from network
      *
@@ -1122,8 +1130,8 @@ namespace cryptonote
      epee::math_helper::once_a_time_seconds<60*2, false> m_deregisters_auto_relayer; //!< interval for checking re-relaying deregister votes
      epee::math_helper::once_a_time_seconds<60*60*12, true> m_check_updates_interval; //!< interval for checking for new versions
      epee::math_helper::once_a_time_seconds<60*10, true> m_check_disk_space_interval; //!< interval for checking for disk space
-     epee::math_helper::once_a_time_seconds<UPTIME_PROOF_FREQUENCY_IN_SECONDS, true> m_submit_uptime_proof_interval; //!< interval for submitting uptime proof
-    epee::math_helper::once_a_time_seconds<30, true> m_uptime_proof_pruner;
+	 epee::math_helper::once_a_time_seconds<UPTIME_PROOF_BUFFER_IN_SECONDS, true> m_check_uptime_proof_interval; //!< interval for checking our own uptime proof
+	 epee::math_helper::once_a_time_seconds<30, true> m_uptime_proof_pruner;
      epee::math_helper::once_a_time_seconds<90, false> m_block_rate_interval; //!< interval for checking block rate
      epee::math_helper::once_a_time_seconds<60*60*5, true> m_blockchain_pruning_interval; //!< interval for incremental blockchain pruning
 
