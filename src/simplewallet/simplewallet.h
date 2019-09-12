@@ -54,7 +54,6 @@
 #define MONERO_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
 // Hardcode BitTube's donation address (see #1447)
 constexpr const char MONERO_DONATION_ADDR[] = "bxdaNPkW77u6KYJuYNDSJpfocTXjVpZ7mMAsoNELySdnbAr8U6aMvnULosC456Kk7NRCAS2Xe7o14NF7bbPKyVta39KPYFia3";
-const int AUTOSTAKE_INTERVAL = 60 * 40; // once every 40 minutes.
 
 /*!
  * \namespace cryptonote
@@ -146,6 +145,7 @@ namespace cryptonote
     bool set_ignore_fractional_outputs(const std::vector<std::string> &args = std::vector<std::string>());
     bool set_track_uses(const std::vector<std::string> &args = std::vector<std::string>());
     bool set_device_name(const std::vector<std::string> &args = std::vector<std::string>());
+    bool set_fork_on_autostake(const std::vector<std::string> &args = std::vector<std::string>());
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
     bool start_mining(const std::vector<std::string> &args);
     bool stop_mining(const std::vector<std::string> &args);
@@ -284,6 +284,31 @@ namespace cryptonote
       std::string unlocked;
     };
     bool get_transfers(std::vector<std::string>& args_, std::vector<transfer_view>& transfers);
+
+	struct transfer_view
+	{
+		struct dest_output
+		{
+			std::string wallet_addr;
+			uint64_t    amount;
+			uint64_t    unlock_time;
+		};
+
+		boost::variant<uint64_t, std::string> block;
+		uint64_t timestamp;
+		tools::pay_type type;
+		bool confirmed;
+		bool unlocked;
+		uint64_t amount;
+		crypto::hash hash;
+		std::string payment_id;
+		uint64_t fee;
+		std::vector<dest_output> outputs;
+		std::set<uint32_t> index;
+		std::string note;
+	};
+	bool get_transfers(std::vector<std::string>& args_, std::vector<transfer_view>& transfers);
+
 
     /*!
      * \brief Prints the seed with a nice message

@@ -49,7 +49,6 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "misc_language.h"
-#include "tx_extra.h"
 #include "ringct/rctTypes.h"
 #include "device/device.hpp"
 
@@ -179,6 +178,7 @@ namespace cryptonote
     };
     // tx information
     size_t   version;
+
     uint64_t unlock_time;  //number of block (or time), used as a limitation like: spend this tx not early then block/time
     bool is_mm_tx;
     std::vector<txin_v> vin;
@@ -214,6 +214,9 @@ namespace cryptonote
       vout.clear();
       extra.clear();
     }
+    
+    bool is_deregister_tx() const { return (version >= version_3_per_output_unlock_times) && is_deregister; }
+    
     uint64_t get_unlock_time(size_t out_index) const
    {
      if (version >= version_3_per_output_unlock_times)
@@ -261,7 +264,6 @@ namespace cryptonote
     void set_blob_size_valid(bool v) const { blob_size_valid.store(v,std::memory_order_release); }
     void set_hash(const crypto::hash &h) { hash = h; set_hash_valid(true); }
     void set_blob_size(size_t sz) { blob_size = sz; set_blob_size_valid(true); }
-    bool is_deregister_tx() const { return (version >= version_3_per_output_unlock_times) && is_deregister; }
 
     BEGIN_SERIALIZE_OBJECT()
       if (!typename Archive<W>::is_saving())
