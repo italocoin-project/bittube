@@ -2216,7 +2216,6 @@ bool t_rpc_command_executor::sync_info()
     return true;
 }
 
-<<<<<<< HEAD
 
 static void print_service_node_list_state(cryptonote::network_type nettype, int hard_fork_version, uint64_t *curr_height, std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *> list)
 {
@@ -2940,7 +2939,7 @@ bool t_rpc_command_executor::prepare_sn()
 
   return true;
 }
-=======
+
 bool t_rpc_command_executor::pop_blocks(uint64_t num_blocks)
 {
   cryptonote::COMMAND_RPC_POP_BLOCKS::request req;
@@ -3033,5 +3032,4 @@ bool t_rpc_command_executor::check_blockchain_pruning()
     return true;
 }
 
->>>>>>> origin/master
 }// namespace daemonize

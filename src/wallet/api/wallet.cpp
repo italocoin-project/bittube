@@ -2406,7 +2406,6 @@ bool WalletImpl::isKeysFileLocked()
 {
     return m_wallet->is_keys_file_locked();
 }
-<<<<<<< HEAD
 PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, const std::string& address_str, const std::string& amount_str)
 {
   crypto::public_key sn_key;
@@ -2434,13 +2433,13 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
   transaction->m_pending_tx = m_wallet->create_stake_tx(sn_key, addr_info, amount);
 
   return transaction;
-=======
+}
 
 uint64_t WalletImpl::coldKeyImageSync(uint64_t &spent, uint64_t &unspent)
 {
     return m_wallet->cold_key_image_sync(spent, unspent);
->>>>>>> origin/master
 }
+
 } // namespace
 
 

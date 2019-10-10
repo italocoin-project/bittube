@@ -1,10 +1,6 @@
 // Copyright (c) 2014-2018, The Monero Project
-<<<<<<< HEAD
-//
-=======
 // Copyright (c) 2018, The BitTube Project
 // 
->>>>>>> origin/master
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without modification, are
@@ -281,12 +277,8 @@ namespace cryptonote
         KV_SERIALIZE(current_blockchain_height)
       END_KV_SERIALIZE_MAP()
     };
-<<<<<<< HEAD
-  };
-=======
     typedef epee::misc_utils::struct_init<request_t> request;
   };  
->>>>>>> origin/master
 
   /************************************************************************/
   /*                                                                      */
@@ -307,7 +299,6 @@ namespace cryptonote
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(missing_tx_indices)
       END_KV_SERIALIZE_MAP()
     };
-<<<<<<< HEAD
   };
   /************************************************************************/
    /*                                                                      */
@@ -350,10 +341,6 @@ namespace cryptonote
         KV_SERIALIZE_VAL_POD_AS_BLOB(sig)
       END_KV_SERIALIZE_MAP()
     };
-  };
-=======
     typedef epee::misc_utils::struct_init<request_t> request;
-  }; 
-    
->>>>>>> origin/master
+  };
 }
